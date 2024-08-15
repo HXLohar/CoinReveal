@@ -1,3 +1,8 @@
+import copy
+import random
+
+import math_class
+
 MAX_WIN = 250000
 class block:
     def __init__(self, ID, block_type="empty", block_value=0):
@@ -26,17 +31,42 @@ class block:
         if self.block_type == "collect":
             return f"[ C ]"
 
+def wrap_string(block):
+    if block.block_type == "empty":
+        return ""
+    if block.block_type == "coin":
+        return f"{block.block_value}"
+    if block.block_type == "special_coin":
+        return f"s{block.block_value}"
+    if block.block_type == "multiplier":
+        return f"x{block.block_value}"
+    if block.block_type == "collect":
+        return f"C"
+def unwrap_string(wrapped_string):
+    if wrapped_string == "":
+        return block(0)
+    if wrapped_string[0] == "s":
+        return block(0, "special_coin", int(wrapped_string[1:]))
+    if wrapped_string[0] == "C":
+        return block(0, "collect")
+    if wrapped_string[0] == "x":
+        return block(0, "multiplier", int(wrapped_string[1:]))
+    return block(0, "coin", int(wrapped_string))
 
 class board_state:
     def __init__(self, math_model, seed, copy_from_board=None, event="spin"):
         # if copy_from_board is not None, deep copy it
         self.math_model = math_model
         self.seed = seed
-        self.board = [block] * 25
+        # begin with 25 empty blocks
+        self.board = []
+        for i in range(25):
+            self.board.append(block(i))
+        self.c_activated = 0
         if copy_from_board is not None:
             self.board = copy.deepcopy(copy_from_board.board)
     def is_finished_state(self):
-        # if the sum of all block's value is no less than than MAX_WIN, return True
+        # if the sum of all block's value is no less than MAX_WIN, return True
         sum = 0
         for block in self.board:
             sum += block.get_value()
@@ -82,7 +112,13 @@ class board_state:
 
         return "ERROR: nothing happened"
 
-    def spin(self, math_model, seed):
+    def spin(self, math_model, c_activated, seed):
+        wrapped_board = []
+        for block_instance in self.board:
+            wrapped_board.append(wrap_string(block_instance))
+        result = math_class.call_model_A(wrapped_board, c_activated, seed)
+        for i in range(25):
+            self.board[i] = unwrap_string(result[i])
         return 0
 
 class round:
@@ -95,4 +131,7 @@ class round:
         self.board_history = []
     def get_latest_board(self):
         return self.board_history[-1]
+    def spin(self):
+        self.current_board.spin(self.math_model, self.current_board.c_activated, self.seed)
+        self.board_history.append(copy.deepcopy(self.current_board))
 
