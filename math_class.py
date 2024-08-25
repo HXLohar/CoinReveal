@@ -17,10 +17,10 @@ def call_model_A(wrapped_board_state, c_activated, seed):
             c_block = random.choice(empty_block_indices)
             wrapped_board_state[c_block] = 'C'
 
-    coin_chances = [3, 47, 300, 1250, 5000, 15000, 45000, 140000, 400000, 800000, 1500000, 2350000, 4300000]
+    coin_chances = [3, 47, 450, 1750, 8000, 23750, 65000, 151000, 375000, 875000, 1510000, 2350000, 4300000]
     coin_values = [10000, 5000, 2500, 1000, 500, 250, 100, 50, 25, 10, 5, 2, 1]
     coin_chance_total = sum(coin_chances)
-    multiplier_chances = [2, 28, 1270, 127000, 96000, 333400]
+    multiplier_chances = [2, 43, 1155, 14700, 57100, 177000]
     multiplier_values = [100, 20, 10, 5, 3, 2]
 
     for i in range(len(wrapped_board_state)):

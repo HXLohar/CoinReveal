@@ -34,7 +34,7 @@ class visualized_window:
         self.rounds_entry.place(x=350, y=360, width=100, height=20)
 
         # Add a button to perform the rounds
-        self.rounds_button = tk.Button(self.window, text="Perform Rounds", command=self.action_spins)
+        self.rounds_button = tk.Button(self.window, text="Action Spins", command=self.action_spins)
         self.rounds_button.place(x=350, y=390, width=100, height=50)
 
         # display the interface
@@ -42,7 +42,7 @@ class visualized_window:
     def action_spins(self):
         alert_threshold = default_alert_threshold
         num_rounds = int(self.rounds_entry.get())
-        if messagebox.askokcancel("Perform Rounds", f"Are you sure you want to perform {num_rounds} rounds?"):
+        if messagebox.askokcancel("Action Spins", f"Are you sure you want to perform {num_rounds} rounds?"):
             for i in range(num_rounds):
                 self.Round = round_class.Round()
                 self.action_spin = True
