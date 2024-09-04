@@ -11,7 +11,7 @@ class visualized_window:
         self.Round = round_class
         if round_class is None:
             self.Round = round_class.Round()
-        self.board_state = self.Round.get_latest_board()
+        self.board_state = self.Round.current_board
         # window size 800x600 with disabled minimize and maximize buttons and not allowing size change
         self.window = tk.Tk()
         self.window.title("CoinFLip")
@@ -43,6 +43,7 @@ class visualized_window:
         alert_threshold = default_alert_threshold
         num_rounds = int(self.rounds_entry.get())
         if messagebox.askokcancel("Action Spins", f"Are you sure you want to perform {num_rounds} rounds?"):
+            print("called action spins")
             for i in range(num_rounds):
                 self.Round = round_class.Round()
                 self.action_spin = True
@@ -70,7 +71,7 @@ class visualized_window:
 
             self.Round.next_step()
             if not self.action_spin:
-                self.update(self.Round.get_latest_board())
+                self.update(self.Round.current_board)
                 self.window.update()
 
 

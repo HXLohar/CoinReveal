@@ -32,6 +32,9 @@ class block:
             return f"x{self.block_value}"
         if self.block_type == "collect":
             return f"[ C ]"
+        if self.block_type == "bonus":
+            return "BONUS"
+
 
 def wrap_string(block):
     if block.block_type == "empty":
@@ -44,6 +47,8 @@ def wrap_string(block):
         return f"x{block.block_value}"
     if block.block_type == "collect":
         return f"C"
+    if block.block_type == "bonus":
+        return f"BONUS"
 def unwrap_string(wrapped_string):
     if wrapped_string == "":
         return block(0)
@@ -53,6 +58,8 @@ def unwrap_string(wrapped_string):
         return block(0, "collect")
     if wrapped_string[0] == "x":
         return block(0, "multiplier", int(wrapped_string[1:]))
+    if wrapped_string == "BONUS":
+        return block(0, "bonus")
     return block(0, "coin", int(wrapped_string))
 
 class board_state:
@@ -74,13 +81,19 @@ class board_state:
             return True
         # if every block is either coin or special_coin, return True
         for block in self.board:
-            if block.block_type != "coin" and block.block_type != "special_coin":
+            if block.block_type != "coin" and block.block_type != "special_coin" and block.block_type != "bonus":
                 return False
         return True
     def get_total_value(self):
         sum = 0
         for block in self.board:
             sum += block.get_value()
+        bonus_count = 0
+        for block in self.board:
+            if block.block_type == "bonus":
+                bonus_count += 1
+        bonus_pay = [0, 0, 80, 200, 500]
+        sum += bonus_pay[bonus_count-1]
         return sum
     def next_step(self):
 
@@ -119,13 +132,17 @@ class board_state:
         return "ERROR: nothing happened"
 
     def spin(self, math_model, c_activated, seed):
-        wrapped_board = []
-        for block_instance in self.board:
-            wrapped_board.append(wrap_string(block_instance))
+        wrapped_board = self.wrap_board()
         result = math_class.call_model_A(wrapped_board, c_activated, seed)
         for i in range(25):
             self.board[i] = unwrap_string(result[i])
         return 0
+    def wrap_board(self):
+        wrapped_board = []
+        for block_instance in self.board:
+            wrapped_board.append(wrap_string(block_instance))
+        return wrapped_board
+
 
 class Round:
     def __init__(self, math_model=1, assigned_seed=-1):
@@ -137,17 +154,26 @@ class Round:
         self.board_history = []
         self.result = 0
     def get_latest_board(self):
-        return self.board_history[-1]
+        latest_board_string = self.board_history[-1]
+        # unwrap string to board
+        latest_board = board_state(self.math_model, self.seed)
+        index = 0
+        for wrapped_string in latest_board_string:
+            latest_board.board[index] = unwrap_string(wrapped_string)
+            index += 1
+        return latest_board
     def spin(self):
         self.current_board.spin(self.math_model, self.current_board.c_activated, self.seed)
-        self.board_history.append(copy.deepcopy(self.current_board))
+
+        self.board_history.append(self.current_board.wrap_board())
 
     def next_step(self):
         if self.current_board.is_finished_state():
             self.result = self.current_board.get_total_value()
         else:
             self.current_board.next_step()
-            self.board_history.append(copy.deepcopy(self.current_board))
+
+            self.board_history.append(self.current_board.wrap_board())
 
 
     def add_to_database(self):
@@ -159,30 +185,36 @@ class Round:
         table_name = db_Table_Name
         # Create the table if it doesn't exist
         table_name = db_Table_Name
+        bonus_symbol_count = 0
+        for block in self.current_board.board:
+            if block.block_type == "bonus":
+                bonus_symbol_count += 1
         c.execute(f'''
                             CREATE TABLE IF NOT EXISTS {table_name} (
                                 id INTEGER PRIMARY KEY,
                                 board_history TEXT,
                                 result INTEGER,
-                                c_activated INTEGER
+                                c_activated INTEGER,
+                                bonus_symbol_count INTEGER
                             )
                         ''')
 
         # Convert the board history to a string
         wrapped_boards = []
         for board in self.board_history:
-            wrapped_board = []
-            for block_instance in board.board:
-                wrapped_board.append(wrap_string(block_instance))
-            wrapped_boards.append(json.dumps(wrapped_board))
+            # board_history is now a list of strings
+            # so can be saved directly
+            wrapped_boards.append(' '.join(board))
         board_history_str = '\n'.join(wrapped_boards)
 
         # Insert the current round's data into the table
         c.execute(f'''
-                                        INSERT INTO {table_name} (board_history, result, c_activated)
-                                        VALUES (?, ?, ?)
-                                    ''', (board_history_str, self.result, self.current_board.c_activated))
+                                        INSERT INTO {table_name} (board_history, result, c_activated, bonus_symbol_count)
+                                        VALUES (?, ?, ?, ?)
+                                    ''', (board_history_str, self.result, self.current_board.c_activated, bonus_symbol_count))
 
         # Commit the changes and close the connection
         conn.commit()
         conn.close()
+        # print wrapped string after finish
+        # print(board_history_str[-1])

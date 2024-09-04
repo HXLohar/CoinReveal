@@ -24,6 +24,15 @@ def call_model_A(wrapped_board_state, c_activated, seed):
     multiplier_values = [100, 20, 10, 5, 3, 2]
 
     for i in range(len(wrapped_board_state)):
+        bonus_count = wrapped_board_state.count("BONUS")
+
+        # Calculate the chance of getting a BONUS symbol
+        bonus_chances = {0: 0.037, 1: 0.032, 2: 0.021, 3: 0.016, 4: 0.008, 5: 0.0}
+        chance_bonus = bonus_chances.get(bonus_count, 0.0)
+        RNG = random.random()
+        if RNG < chance_bonus:
+            wrapped_board_state[i] = "BONUS"
+            continue
         if wrapped_board_state[i] == "":
             if random.random() < coin_chance_total:
                 coin = random.choices(coin_values, weights=coin_chances, k=1)[0]
