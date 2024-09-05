@@ -2,6 +2,7 @@ import tkinter as tk
 from time import sleep
 import threading
 from tkinter import messagebox
+import time
 
 import round_class
 default_alert_threshold = [1, 2, 5]
@@ -52,11 +53,13 @@ class visualized_window:
                     self.next_step()
                 self.Round.add_to_database()
                 if i in alert_threshold:
-                    print(f"Progress: Round {i} finished")
+                    output_string = "Current Time: " + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + ", "
+                    output_string += f"Progress: Round {i} finished"
+                    print(output_string)
                 if i > alert_threshold[0] * 9:
                     for j in range(len(alert_threshold)):
                         alert_threshold[j] *= 10
-        print("Mission complete. You're welcome.")
+        print("Current Time: " + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + ", Mission complete. You're welcome.")
 
     def update(self, new_board_state):
         self.board_state = new_board_state

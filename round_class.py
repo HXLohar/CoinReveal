@@ -4,7 +4,7 @@ import sqlite3
 import json
 import math_class
 
-db_Table_Name = "test_A2_4"
+db_Table_Name = "test_A3"
 MAX_WIN = 250000
 class block:
     def __init__(self, ID, block_type="empty", block_value=0):
@@ -17,13 +17,15 @@ class block:
         return 0
     def multiply(self, multiplier):
         if self.block_type == "coin" or self.block_type == "special_coin":
+            # print("block value before multiply: " + str(self.block_value)
+                    # + ", multiplier: " + str(multiplier))
             self.block_value *= multiplier
     def erase(self):
         self.block_type = "empty"
         self.block_value = 0
     def get_string(self):
         if self.block_type == "empty":
-            return ""
+            return "/"
         if self.block_type == "coin":
             return f"{self.block_value:,}"
         if self.block_type == "special_coin":
@@ -38,7 +40,7 @@ class block:
 
 def wrap_string(block):
     if block.block_type == "empty":
-        return ""
+        return "/"
     if block.block_type == "coin":
         return f"{block.block_value}"
     if block.block_type == "special_coin":
@@ -50,8 +52,8 @@ def wrap_string(block):
     if block.block_type == "bonus":
         return f"BONUS"
 def unwrap_string(wrapped_string):
-    if wrapped_string == "":
-        return block(0)
+    if wrapped_string == "/":
+        return block(0, "empty", 0)
     if wrapped_string[0] == "s":
         return block(0, "special_coin", int(wrapped_string[1:]))
     if wrapped_string[0] == "C":
@@ -74,6 +76,8 @@ class board_state:
         self.c_activated = 0
         if copy_from_board is not None:
             self.board = copy.deepcopy(copy_from_board.board)
+        self.multi_activated = 0
+        self.total_multi = 1
     def is_finished_state(self):
         # if the sum of all block's value is no less than MAX_WIN, return True
         sum = self.get_total_value()
@@ -92,8 +96,12 @@ class board_state:
         for block in self.board:
             if block.block_type == "bonus":
                 bonus_count += 1
-        bonus_pay = [0, 0, 80, 200, 500]
-        sum += bonus_pay[bonus_count-1]
+        bonus_pay = [0, 0, 0, 80, 200, 500]
+        sum += bonus_pay[bonus_count]
+        # print("BONUS: " + str(bonus_count))
+        # print(f"BONUS pay: {bonus_pay[bonus_count]}")
+        if sum > MAX_WIN:
+            sum = MAX_WIN
         return sum
     def next_step(self):
 
@@ -103,6 +111,8 @@ class board_state:
         flag_event = False
         for block in self.board:
             if block.block_type == "multiplier":
+                self.multi_activated += 1
+                self.total_multi *= block.block_value
                 for block2 in self.board:
                     block2.multiply(block.block_value)
                 block.erase()
@@ -195,7 +205,10 @@ class Round:
                                 board_history TEXT,
                                 result INTEGER,
                                 c_activated INTEGER,
-                                bonus_symbol_count INTEGER
+                                multi_count INTEGER,
+                                multi_total INTEGER,
+                                bonus_symbol_count INTEGER,
+                                BONUS_pay INTEGER
                             )
                         ''')
 
@@ -205,13 +218,16 @@ class Round:
             # board_history is now a list of strings
             # so can be saved directly
             wrapped_boards.append(' '.join(board))
+        multi_count = self.current_board.multi_activated
+        multi_total = self.current_board.total_multi
         board_history_str = '\n'.join(wrapped_boards)
-
+        bonus_pay = [0, 0, 0, 80, 200, 500]
         # Insert the current round's data into the table
         c.execute(f'''
-                                        INSERT INTO {table_name} (board_history, result, c_activated, bonus_symbol_count)
-                                        VALUES (?, ?, ?, ?)
-                                    ''', (board_history_str, self.result, self.current_board.c_activated, bonus_symbol_count))
+                                        INSERT INTO {table_name} (board_history, result, c_activated, multi_count, multi_total, bonus_symbol_count, bonus_pay)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                                    ''', (board_history_str, self.result, self.current_board.c_activated, multi_count, multi_total,
+                                          bonus_symbol_count, bonus_pay[bonus_symbol_count]))
 
         # Commit the changes and close the connection
         conn.commit()
