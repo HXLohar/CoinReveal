@@ -1,14 +1,19 @@
 import random
 import time
-
+MIN_C_CHANCE_PER_BLOCK = 0.0015
+C_CHANCE_DECREASE_SPEED = 0.55
+C_CHANCE_PER_BLOCK = 0.0135
 random.seed(time.time())
+
 def call_model_A(wrapped_board_state, c_activated, seed):
     # print("Previous state\n", wrapped_board_state)
 
     empty_blocks = wrapped_board_state.count("/")
     # print("Empty blocks:", empty_blocks)
-    offset_factor = max(0.625 ** c_activated, 0.15)
-    chance_c = 0.0175 * empty_blocks * offset_factor
+
+    offset_factor = (1-C_CHANCE_DECREASE_SPEED) ** c_activated
+    chance_c = max(C_CHANCE_PER_BLOCK * empty_blocks * offset_factor, MIN_C_CHANCE_PER_BLOCK)
+
     RNG = random.random()
     # print("chance_c is:", chance_c)
     # print("RNG is:", RNG)
@@ -21,10 +26,10 @@ def call_model_A(wrapped_board_state, c_activated, seed):
             # print("chosen block index:", c_block)
             wrapped_board_state[c_block] = 'C'
 
-    coin_chances = [3, 117, 480, 2250, 11000, 27900, 67000, 170000, 370000, 770000, 1350000, 2400000, 4591250]
+    coin_chances = [3, 117, 480, 2250, 16000, 39900, 85000, 130000, 325000, 475000, 1450000, 3000000, 4306250]
     coin_values = [10000, 5000, 2500, 1000, 500, 250, 100, 50, 25, 10, 5, 2, 1]
 
-    multiplier_chances = [15, 185, 1800, 9500, 57500, 171000]
+    multiplier_chances = [10, 115, 1200, 9225, 36450, 123000]
     multiplier_values = [100, 20, 10, 5, 3, 2]
     coin_chance_total = sum(coin_chances) / (sum(coin_chances) + sum(multiplier_chances))
     for i in range(len(wrapped_board_state)):

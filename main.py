@@ -41,6 +41,7 @@ class visualized_window:
         # display the interface
         self.window.mainloop()
     def action_spins(self):
+        Round_results = []
         alert_threshold = default_alert_threshold
         num_rounds = int(self.rounds_entry.get())
         if messagebox.askokcancel("Action Spins", f"Are you sure you want to perform {num_rounds} rounds?"):
@@ -52,6 +53,7 @@ class visualized_window:
                 while not self.Round.get_latest_board().is_finished_state():
                     self.next_step()
                 self.Round.add_to_database()
+                Round_results.append(self.Round.current_board.get_total_value())
                 if i in alert_threshold:
                     output_string = "Current Time: " + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + ", "
                     output_string += f"Progress: Round {i} finished"
@@ -59,6 +61,31 @@ class visualized_window:
                 if i > alert_threshold[0] * 9:
                     for j in range(len(alert_threshold)):
                         alert_threshold[j] *= 10
+        print("--------\nAverage and Median\b")
+        print(f"Average result: {sum(Round_results) / len(Round_results):.2f}")
+        print(f"Median result: ", sorted(Round_results)[len(Round_results) // 2])
+        print("--------\nLeaderboard\n")
+        print(f"# 1: ", sorted(Round_results)[-1])
+        print(f"# 2: ", sorted(Round_results)[-2])
+        print(f"# 3: ", sorted(Round_results)[-3])
+        print("--------\nTop percentile\n")
+        print("Top 1% percentile: ", sorted(Round_results)[-num_rounds // 100])
+        print("Top 2% percentile: ", sorted(Round_results)[-num_rounds // 50])
+        print("Top 5% percentile: ", sorted(Round_results)[-num_rounds // 20])
+        print("Top 10% percentile: ", sorted(Round_results)[-num_rounds // 10])
+        print("Top 25% percentile: ", sorted(Round_results)[-num_rounds // 4])
+        print("--------\nBottom percentile\n")
+        print("Bottom 25% percentile: ", sorted(Round_results)[num_rounds // 4])
+        print("Bottom 10% percentile: ", sorted(Round_results)[num_rounds // 10])
+        print("Bottom 5% percentile: ", sorted(Round_results)[num_rounds // 20])
+        print("Bottom 2% percentile: ", sorted(Round_results)[num_rounds // 50])
+        print("Bottom 1% percentile: ", sorted(Round_results)[num_rounds // 100])
+        thresholds = [500, 1000, 2500, 5000, 10000, 20000, 50000]
+        print("--------\nThresholds\n")
+        for threshold in thresholds:
+            qualifying_rounds = len([x for x in Round_results if x >= threshold])
+            print(f"Rounds >= {threshold}: {qualifying_rounds} (1 in {num_rounds / qualifying_rounds:.2f})")
+
         print("Current Time: " + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + ", Mission complete. You're welcome.")
 
     def update(self, new_board_state):
