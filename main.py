@@ -5,11 +5,13 @@ from tkinter import messagebox
 import time
 
 import round_class
-default_alert_threshold = [1, 2, 5]
+
 CONST_SLEEP_TIME = 50
+DATABASE_UPDATE_INTERVAL = 500
 class visualized_window:
     def __init__(self, round_class=None):
         self.Round = round_class
+        self.Round_list = []
         if round_class is None:
             self.Round = round_class.Round()
         self.board_state = self.Round.current_board
@@ -41,18 +43,25 @@ class visualized_window:
         # display the interface
         self.window.mainloop()
     def action_spins(self):
+
         Round_results = []
-        alert_threshold = default_alert_threshold
+        alert_threshold = [1, 2, 5]
+        # print("alert_threshold", alert_threshold)
         num_rounds = int(self.rounds_entry.get())
         if messagebox.askokcancel("Action Spins", f"Are you sure you want to perform {num_rounds} rounds?"):
-            print("called action spins")
+            # print("called action spins")
             for i in range(num_rounds):
                 self.Round = round_class.Round()
                 self.action_spin = True
                 self.Round.spin()
                 while not self.Round.get_latest_board().is_finished_state():
                     self.next_step()
-                self.Round.add_to_database()
+                # only interact with the database once every DATABASE_UPDATE_INTERVAL rounds
+                self.Round_list.append(self.Round)
+                if i % DATABASE_UPDATE_INTERVAL == (DATABASE_UPDATE_INTERVAL - 1) or i == num_rounds - 1:
+                    round_class.add_to_database(self.Round_list)
+                    self.Round_list = []
+
                 Round_results.append(self.Round.current_board.get_total_value())
                 if i in alert_threshold:
                     output_string = "Current Time: " + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + ", "
@@ -80,15 +89,19 @@ class visualized_window:
         print("Bottom 5% percentile: ", sorted(Round_results)[num_rounds // 20])
         print("Bottom 2% percentile: ", sorted(Round_results)[num_rounds // 50])
         print("Bottom 1% percentile: ", sorted(Round_results)[num_rounds // 100])
-        thresholds = [500, 1000, 2500, 5000, 10000, 20000, 50000]
+        thresholds = [500, 1000, 2500, 5000, 10000, 20000, 50000, 100000, 150000, 200000, 250000]
         print("--------\nThresholds\n")
         for threshold in thresholds:
             qualifying_rounds = len([x for x in Round_results if x >= threshold])
-            print(f"Rounds >= {threshold}: {qualifying_rounds} (1 in {num_rounds / qualifying_rounds:.2f})")
+            if qualifying_rounds > 0:
+                print(f"Rounds >= {threshold}: {qualifying_rounds} (1 in {num_rounds / qualifying_rounds:.2f})")
+            else:
+                print(f"Rounds >= {threshold}: {qualifying_rounds} (1 in *undefined*)")
 
         print("Current Time: " + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + ", Mission complete. You're welcome.")
 
     def update(self, new_board_state):
+        print("update method called")
         self.board_state = new_board_state
         for i in range(25):
             self.labels[i].config(text=self.board_state.board[i].get_string())

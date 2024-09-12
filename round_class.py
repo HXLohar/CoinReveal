@@ -3,8 +3,9 @@ import random
 import sqlite3
 import json
 import math_class
+import numpy
 
-db_Table_Name = "test_A4_1M_rounds"
+db_Table_Name = "test_A4_1"
 MAX_WIN = 250000
 class block:
     def __init__(self, ID, block_type="empty", block_value=0):
@@ -92,13 +93,10 @@ class board_state:
         sum = 0
         for block in self.board:
             sum += block.get_value()
-        bonus_count = 0
-        for block in self.board:
-            if block.block_type == "bonus":
-                bonus_count += 1
+        bonus_count = numpy.where(self.board == "BONUS")[0].size
         bonus_pay = [0, 0, 0, 80, 200, 500]
-        sum += bonus_pay[bonus_count]
         # print("BONUS: " + str(bonus_count))
+        sum += bonus_pay[bonus_count]
         # print(f"BONUS pay: {bonus_pay[bonus_count]}")
         if sum > MAX_WIN:
             sum = MAX_WIN
@@ -163,6 +161,12 @@ class Round:
         self.current_board = board_state(self.math_model, self.seed)
         self.board_history = []
         self.result = 0
+
+    def batch_spin(self, num_spins):
+        results = []
+        for _ in range(num_spins):
+            results.append(self.spin())
+        return results
     def get_latest_board(self):
         latest_board_string = self.board_history[-1]
         # unwrap string to board
@@ -174,7 +178,6 @@ class Round:
         return latest_board
     def spin(self):
         self.current_board.spin(self.math_model, self.current_board.c_activated, self.seed)
-
         self.board_history.append(self.current_board.wrap_board())
 
     def next_step(self):
@@ -186,51 +189,43 @@ class Round:
             self.board_history.append(self.current_board.wrap_board())
 
 
-    def add_to_database(self):
-        self.result = self.current_board.get_total_value()
+def add_to_database(rounds):
+    # Connect to the SQLite database (or create it if it doesn't exist)
+    conn = sqlite3.connect('data.db')
+    c = conn.cursor()
+    table_name = db_Table_Name
+    # Create the table if it doesn't exist
+    c.execute(f'''
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    id INTEGER PRIMARY KEY,
+                    board_history TEXT,
+                    result INTEGER,
+                    c_activated INTEGER,
+                    multi_count INTEGER,
+                    multi_total INTEGER,
+                    bonus_symbol_count INTEGER,
+                    BONUS_pay INTEGER
+                )
+            ''')
 
-        # Connect to the SQLite database (or create it if it doesn't exist)
-        conn = sqlite3.connect('data.db')
-        c = conn.cursor()
-        table_name = db_Table_Name
-        # Create the table if it doesn't exist
-        table_name = db_Table_Name
-        bonus_symbol_count = 0
-        for block in self.current_board.board:
-            if block.block_type == "bonus":
-                bonus_symbol_count += 1
-        c.execute(f'''
-                            CREATE TABLE IF NOT EXISTS {table_name} (
-                                id INTEGER PRIMARY KEY,
-                                board_history TEXT,
-                                result INTEGER,
-                                c_activated INTEGER,
-                                multi_count INTEGER,
-                                multi_total INTEGER,
-                                bonus_symbol_count INTEGER,
-                                BONUS_pay INTEGER
-                            )
-                        ''')
-
+    for round in rounds:
         # Convert the board history to a string
         wrapped_boards = []
-        for board in self.board_history:
-            # board_history is now a list of strings
-            # so can be saved directly
+        for board in round.board_history:
             wrapped_boards.append(' '.join(board))
-        multi_count = self.current_board.multi_activated
-        multi_total = self.current_board.total_multi
         board_history_str = '\n'.join(wrapped_boards)
-        bonus_pay = [0, 0, 0, 80, 200, 500]
+
+        # Calculate bonus_symbol_count and BONUS_pay
+        bonus_symbol_count = numpy.where(numpy.array(round.current_board.board) == "BONUS")[0].size
+        bonus_pay = [0, 0, 0, 80, 200, 500][bonus_symbol_count]
+
         # Insert the current round's data into the table
         c.execute(f'''
-                                        INSERT INTO {table_name} (board_history, result, c_activated, multi_count, multi_total, bonus_symbol_count, bonus_pay)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                                    ''', (board_history_str, self.result, self.current_board.c_activated, multi_count, multi_total,
-                                          bonus_symbol_count, bonus_pay[bonus_symbol_count]))
+                    INSERT INTO {table_name} (board_history, result, c_activated, multi_count, multi_total, bonus_symbol_count, BONUS_pay)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (board_history_str, round.result, round.current_board.c_activated, round.current_board.multi_activated, round.current_board.total_multi,
+                      bonus_symbol_count, bonus_pay))
 
-        # Commit the changes and close the connection
-        conn.commit()
-        conn.close()
-        # print wrapped string after finish
-        # print(board_history_str[-1])
+    # Commit the changes and close the connection
+    conn.commit()
+    conn.close()
