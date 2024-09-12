@@ -4,7 +4,7 @@ import sqlite3
 import json
 import math_class
 
-db_Table_Name = "test_A4"
+db_Table_Name = "test_A4_1M_rounds"
 MAX_WIN = 250000
 class block:
     def __init__(self, ID, block_type="empty", block_value=0):
