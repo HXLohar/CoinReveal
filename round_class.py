@@ -5,7 +5,6 @@ import json
 import math_class
 import numpy
 
-db_Table_Name = "test_A4_1"
 MAX_WIN = 250000
 class block:
     def __init__(self, ID, block_type="empty", block_value=0):
@@ -79,24 +78,28 @@ class board_state:
             self.board = copy.deepcopy(copy_from_board.board)
         self.multi_activated = 0
         self.total_multi = 1
+        self.BONUS_symbol_count = 0
+
     def is_finished_state(self):
         # if the sum of all block's value is no less than MAX_WIN, return True
         sum = self.get_total_value()
         if sum >= MAX_WIN:
+
             return True
         # if every block is either coin or special_coin, return True
         for block in self.board:
             if block.block_type != "coin" and block.block_type != "special_coin" and block.block_type != "bonus":
                 return False
+
         return True
     def get_total_value(self):
         sum = 0
         for block in self.board:
             sum += block.get_value()
-        bonus_count = numpy.where(self.board == "BONUS")[0].size
+
         bonus_pay = [0, 0, 0, 80, 200, 500]
         # print("BONUS: " + str(bonus_count))
-        sum += bonus_pay[bonus_count]
+        sum += bonus_pay[self.BONUS_symbol_count]
         # print(f"BONUS pay: {bonus_pay[bonus_count]}")
         if sum > MAX_WIN:
             sum = MAX_WIN
@@ -141,7 +144,7 @@ class board_state:
 
     def spin(self, math_model, c_activated, seed):
         wrapped_board = self.wrap_board()
-        result = math_class.call_model_A(wrapped_board, c_activated, seed)
+        result, self.BONUS_symbol_count = math_class.call_model_A(wrapped_board, c_activated, seed)
         for i in range(25):
             self.board[i] = unwrap_string(result[i])
         return 0
@@ -160,7 +163,7 @@ class Round:
             self.seed = random.randint(0, 10000)
         self.current_board = board_state(self.math_model, self.seed)
         self.board_history = []
-        self.result = 0
+        # self.result = 0
 
     def batch_spin(self, num_spins):
         results = []
@@ -189,11 +192,11 @@ class Round:
             self.board_history.append(self.current_board.wrap_board())
 
 
-def add_to_database(rounds):
+def add_to_database(rounds, db_file_name="data.db", db_table_name="default_table"):
     # Connect to the SQLite database (or create it if it doesn't exist)
-    conn = sqlite3.connect('data.db')
+    conn = sqlite3.connect(db_file_name)
     c = conn.cursor()
-    table_name = db_Table_Name
+    table_name = db_table_name
     # Create the table if it doesn't exist
     c.execute(f'''
                 CREATE TABLE IF NOT EXISTS {table_name} (
@@ -204,7 +207,7 @@ def add_to_database(rounds):
                     multi_count INTEGER,
                     multi_total INTEGER,
                     bonus_symbol_count INTEGER,
-                    BONUS_pay INTEGER
+                    bonus_pay INTEGER
                 )
             ''')
 
@@ -216,14 +219,16 @@ def add_to_database(rounds):
         board_history_str = '\n'.join(wrapped_boards)
 
         # Calculate bonus_symbol_count and BONUS_pay
-        bonus_symbol_count = numpy.where(numpy.array(round.current_board.board) == "BONUS")[0].size
+        bonus_symbol_count = round.current_board.BONUS_symbol_count
+        # print(bonus_symbol_count)
         bonus_pay = [0, 0, 0, 80, 200, 500][bonus_symbol_count]
+        result = round.current_board.get_total_value()
 
         # Insert the current round's data into the table
         c.execute(f'''
-                    INSERT INTO {table_name} (board_history, result, c_activated, multi_count, multi_total, bonus_symbol_count, BONUS_pay)
+                    INSERT INTO {table_name} (board_history, result, c_activated, multi_count, multi_total, bonus_symbol_count, bonus_pay)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (board_history_str, round.result, round.current_board.c_activated, round.current_board.multi_activated, round.current_board.total_multi,
+                ''', (board_history_str, result, round.current_board.c_activated, round.current_board.multi_activated, round.current_board.total_multi,
                       bonus_symbol_count, bonus_pay))
 
     # Commit the changes and close the connection
