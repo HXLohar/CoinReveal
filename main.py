@@ -3,6 +3,9 @@ from time import sleep
 import threading
 from tkinter import messagebox
 from tkinter import simpledialog
+from PIL import Image, ImageTk
+import asyncio
+
 import cProfile
 import pstats
 import time
@@ -11,43 +14,139 @@ import round_class
 
 CONST_SLEEP_TIME = 50
 DATABASE_UPDATE_INTERVAL = 1000
+# CURRENCY_UNIT = "POL"
+# CONST_BASE_BET = 0.005
+CURRENCY_UNIT = "XMR"
+CONST_BASE_BET = 0.005
+CONST_INITIAL_BALANCE = 100
+# CURRENCY_UNIT = "ETH"
+# CONST_BASE_BET = 0.000001
+# CONST_INITIAL_BALANCE = 0.01
 
 
+CONST_BONUS_BUY_COST = 600
+class profile:
+    def __init__(self):
+        self.balance = CONST_INITIAL_BALANCE
+        self.rounds_played = 0
+        self.total_wagered = 0
+        self.total_win = 0
+        self.win_leaderboard = []
+        self.multi_leaderboard = []
+        self.biggest_win = 0
+        self.highest_multi = 0
+        self.speed_preference = 6
+
+    def add_round(self, result_multi, base_bet=CONST_BASE_BET, cost_multi=CONST_BONUS_BUY_COST):
+        total_cost = base_bet * cost_multi
+        win_amount = base_bet * result_multi
+        self.total_wagered += total_cost
+        self.total_win += win_amount
+        self.balance += (win_amount - total_cost)
+        self.rounds_played += 1
+        self.biggest_win = max(self.biggest_win, win_amount)
+        self.highest_multi = max(self.highest_multi, result_multi)
+        if result_multi < 1000:
+            return
+        # if leaderboard is empty or last element is smaller than the current result
+        if len(self.win_leaderboard) == 0 or self.win_leaderboard[-1] < win_amount:
+            self.win_leaderboard.append(win_amount)
+            self.win_leaderboard.sort(reverse=True)
+            if len(self.win_leaderboard) > 10:
+                self.win_leaderboard.pop()
+        # same for multi leaderboard
+        if len(self.multi_leaderboard) == 0 or self.multi_leaderboard[-1] < result_multi:
+            self.multi_leaderboard.append(result_multi)
+            self.multi_leaderboard.sort(reverse=True)
+            if len(self.multi_leaderboard) > 10:
+                self.multi_leaderboard.pop()
+
+    def get_info(self):
+        info_string = f"Balance: {self.balance:,.6f} {CURRENCY_UNIT}\n"
+        info_string += "Rounds played: " + str(self.rounds_played) + "\n"
+        info_string += f"Total wagered: {self.total_wagered:,.6f} {CURRENCY_UNIT}\n"
+        info_string += f"Total win: {self.total_win:,.6f} {CURRENCY_UNIT}\n"
+        if self.rounds_played >= 5:
+            info_string += f"RTP: {(self.total_win/self.total_wagered)*100:06.2f} % / 096.53 %\n"
+        else:
+            info_string += f"RTP: ???.?? % / 096.53 %\n"
+        info_string += f"Biggest win: {self.biggest_win:,.6f} {CURRENCY_UNIT}\n"
+        info_string += f"Highest multiplier: {self.highest_multi:,}x\n"
+        info_string += f"(Base bet: {CONST_BASE_BET:.6f} {CURRENCY_UNIT})\n"
+        info_string += "(Cost per round: " + str(CONST_BASE_BET*CONST_BONUS_BUY_COST) + " " + CURRENCY_UNIT + ")\n"
+
+        return info_string
+
+    def get_interval_between_coins(self):
+        interval = [240, 180, 135, 90, 60, 30, 15]
+        return interval[self.speed_preference]
+
+    def get_interval_between_steps(self):
+        interval = [1600, 1200, 900, 600, 400, 200, 100]
+        return interval[self.speed_preference]
 
 
 class visualized_window:
     def __init__(self, round_class=None):
+        self.PlayerProfile = profile()
         self.Round = round_class
         self.Round_list = []
+
         if round_class is None:
             self.Round = round_class.Round()
+        # self.Round.spin()
         self.board_state = self.Round.current_board
         # window size 800x600 with disabled minimize and maximize buttons and not allowing size change
         self.window = tk.Tk()
-        self.window.title("CoinFLip")
-        self.window.geometry("800x600")
+        self.window.title("CoinFlip.exe")
+        self.window.geometry("900x600")
         self.window.resizable(False, False)
         self.action_spin = False
-        self.labels = []
-        block_size = 50  # size of each block in pixels
+        self.block_display_images = []
+        # profile info is at top right
+        # text align to left
+        self.profile_info_label = tk.Label(self.window, text=self.PlayerProfile.get_info(), font=("Helvetica", 14),
+                                           anchor="w", justify="left")
+        self.profile_info_label.place(x=525, y=10, width=375, height=275)
+        # round result label at bottom right
+        self.round_result_label = tk.Label(self.window, text="Round result:\n\n", font=("Helvetica", 16))
+        self.round_result_label.place(x=510, y=450, width=300, height=150)
+        self.empty_block_index = []
+        self.ONGOING_ROUND = False
+        # self.block_display_labels = []
+        block_size = 90  # size of each block in pixels
         for i in range(5):
             for j in range(5):
-                x = 30 + j * block_size
-                y = 40 + i * block_size
-                label = tk.Label(self.window, text=self.board_state.board[i * 5 + j].get_string(), borderwidth=2,
-                                 relief="groove")
+                index = i * 5 + j
+                y = 30 + j * block_size
+                x = 30 + i * block_size
+                file_name, display_string = self.board_state.blocks[i * 5 + j].get_display_string()
+                image = Image.open(file_name)
+                photo = ImageTk.PhotoImage(image)
+                font_color = 'white' if 'coin_1.png' in file_name else 'black'
+
+                if file_name == "coin_0.png":
+                    self.empty_block_index.append(index)
+                font_size = 16
+                if "[C]" == display_string:
+                    font_size = 24
+                elif "multiplier.png" in file_name:
+                    font_size = 20
+                label = tk.Label(self.window, image=photo, text=display_string, compound='center', borderwidth=2,
+                                 relief="groove", font=("Helvetica", font_size), fg=font_color)
+                label.image = photo  # keep a reference to the image
                 label.place(x=x, y=y, width=block_size, height=block_size)
-                self.labels.append(label)
-        self.spin_button = tk.Button(self.window, text="Spin", command=self.next_step)
-        self.spin_button.place(x=350, y=300, width=100, height=50)
+                self.block_display_images.append(label)
+        self.spin_button = tk.Button(self.window, text="Spin", command=self.init_regular_spin)
+        self.spin_button.place(x=550, y=300, width=100, height=50)
         self.rounds_entry = tk.Entry(self.window)
         DEFAULT_ACTION_SPINS_AMOUNT = '100000'
         self.rounds_entry.insert(0, DEFAULT_ACTION_SPINS_AMOUNT)  # Default value
-        self.rounds_entry.place(x=350, y=360, width=100, height=20)
+        self.rounds_entry.place(x=550, y=360, width=100, height=20)
 
         # Add a button to perform the rounds
         self.rounds_button = tk.Button(self.window, text="Action Spins", command=self.action_spins)
-        self.rounds_button.place(x=350, y=390, width=100, height=50)
+        self.rounds_button.place(x=550, y=390, width=100, height=50)
 
         # display the interface
         self.window.mainloop()
@@ -60,6 +159,9 @@ class visualized_window:
         return result
 
     def action_spins(self):
+        # messagebox.showinfo("出錯了", "無法使用特快.")
+        # return -1
+
         def profiled_code():
 
             Round_results = []
@@ -71,9 +173,10 @@ class visualized_window:
                 # use tkinter to create a popup window, not using the input command line
 
                 db_file_name = self.ask_string("Input", "Please input the db file name\nOr leave blank for data.db:",
-                                          "data.db")
-                db_table_name = self.ask_string("Input", "Please input the table name\nOr leave blank for default_table: ",
-                                           "default_table")
+                                               "data.db")
+                db_table_name = self.ask_string("Input",
+                                                "Please input the table name\nOr leave blank for default_table: ",
+                                                "default_table")
 
                 # print("called action spins")
                 for i in range(num_rounds):
@@ -122,7 +225,7 @@ class visualized_window:
                     print(f"Rounds >= {threshold}: {qualifying_rounds} (1 in {num_rounds / qualifying_rounds:.2f})")
                 else:
                     print(f"Rounds >= {threshold}: {qualifying_rounds} (1 in *undefined*)")
-            print("--------\nAverage and Median\b")
+            print("--------\nAverage and Median\n")
             print(f"Average result: {sum(Round_results) / len(Round_results):.2f}")
             print(f"Median result: ", sorted(Round_results)[len(Round_results) // 2])
             print("Current Time: " + str(
@@ -135,26 +238,102 @@ class visualized_window:
         p = pstats.Stats('profile_results.prof')
         p.sort_stats('cumulative').print_stats(10)
 
-    def update(self, new_board_state):
-        print("update method called")
+    def update_all_blocks(self, new_board_state):
+        # print("update method called")
         self.board_state = new_board_state
         for i in range(25):
-            self.labels[i].config(text=self.board_state.board[i].get_string())
+            self.update_single_block(i, True)
+        self.window.update()  # Update the GUI
+        # print("updating all blocks")
+
+    def update_single_block(self, i, flag_update_all=False):
+
+        file_name, display_string = self.Round.get_latest_board().blocks[i].get_display_string()
+
+        image = Image.open(file_name)
+        photo = ImageTk.PhotoImage(image)
+        font_color = 'white' if 'coin_1.png' in file_name else 'black'
+        font_size = 16
+        if "[C]" == display_string:
+            font_size = 24
+        elif "multiplier.png" in file_name:
+            font_size = 20
+        self.block_display_images[i].config(image=photo, text=display_string, font=("Helvetica", font_size),
+                                            fg=font_color)
+        self.block_display_images[i].image = photo  # keep a reference to the image
+        if not flag_update_all:
+            self.window.update()
+            # print("updating block index", i)
 
     def next_step(self):
         if not self.Round.get_latest_board().is_finished_state():
             self.Round.next_step()
-            if not self.action_spin:
-                self.update(self.Round.current_board)
-                self.window.update()
+            # if not self.action_spin:
+            # self.update_all_blocks(self.Round.current_board)
+            self.window.update()
+            return 0
         else:
             print("Game finished")
             print("Total value:", self.Round.get_latest_board().get_total_value())
-            return
+            print(self.Round.board_history)
+            return 1
+
+    def next_block(self):
+        # pop the 1st one in the list, not the last one
+        if len(self.empty_block_index) < 1:
+            return -1
+        block_index = self.empty_block_index.pop(0)
+        self.update_single_block(block_index)
+
+    def init_regular_spin(self):
+        # create a new round
+        if self.ONGOING_ROUND:
+            # msg box alert: tell user must wait until current round over
+            messagebox.showinfo("警告", "禁止同時進行多個獎勵購買.")
+            return -1
+        self.round_result_label.config(text=f"Round result:\n\n")
+
+        self.ONGOING_ROUND = True
+        self.Round = round_class.Round()
+        self.update_all_blocks(self.Round.get_latest_board())
+        self.Round.spin()
+        for i in range(25):
+            self.empty_block_index.append(i)
+        # then display the result one by one accordingly
+        self.coin_reveal_loop()
+
+    def coin_reveal_loop(self):
+        # Check if the board is in a finished state
+
+        interval = self.PlayerProfile.get_interval_between_coins()
+        # If the board is not in a finished state, continue the loop
+        if len(self.empty_block_index) > 0:
+            # self.window.after(interval, self.next_block)
+            self.next_block()
+        elif not self.Round.get_latest_board().is_finished_state():
+            interval = self.PlayerProfile.get_interval_between_steps()
+            self.window.after(interval, self.next_step)
+            self.update_all_blocks(self.Round.get_latest_board())
+            blocks = self.Round.get_latest_board().blocks
+            for i in range(25):
+                if blocks[i].isEmpty():
+                    self.empty_block_index.append(i)
+        # Call coin_reveal_loop again to continue the loop
+        if self.Round.get_latest_board().is_finished_state() and len(self.empty_block_index) <= 0:
+            print("完整獎金")
+            # print out board history but ignore the first element
+            print(self.Round.board_history[1:])
+            self.ONGOING_ROUND = False
+            Board_Total_Value = self.Round.get_latest_board().get_total_value()
+            self.PlayerProfile.add_round(Board_Total_Value)
+            self.profile_info_label.config(text=self.PlayerProfile.get_info())
+            self.round_result_label.config(text=f"Round result:\n{Board_Total_Value:,}x\n{Board_Total_Value*CONST_BASE_BET:,.6f} {CURRENCY_UNIT}")
+            return 1
+        self.window.after(int(interval * 1.5), self.coin_reveal_loop)
 
 
 test_round = round_class.Round()
-test_round.spin()
+# test_round.spin()
 
 # latest_board = test_round.get_latest_board()
 interface = visualized_window(test_round)
