@@ -5,7 +5,7 @@ import json
 import math_class
 import numpy
 
-MAX_WIN = 250000
+MAX_WIN = 400000
 
 
 class block:
@@ -24,6 +24,8 @@ class block:
             # print("block value before multiply: " + str(self.block_value)
             # + ", multiplier: " + str(multiplier))
             self.block_value *= multiplier
+            if self.block_value > MAX_WIN:
+                self.block_value = MAX_WIN
 
     def erase(self):
         self.block_type = "empty"
@@ -131,6 +133,12 @@ class board_state:
         # if the sum of all block's value is no less than MAX_WIN, return True
         sum = self.get_total_value()
         if sum >= MAX_WIN:
+            # if every block is either coin or special_coin or empty, return True
+            for block in self.blocks:
+                if block.block_type != "coin" and block.block_type != "special_coin" and block.block_type != "bonus" \
+                        and block.block_type != "empty":
+                    return False
+
             return True
         # if every block is either coin or special_coin, return True
         for block in self.blocks:
@@ -184,6 +192,8 @@ class board_state:
                         if block2.block_type != "special_coin":
                             block2.erase()
                 block.block_type = "special_coin"
+                if block.block_value > MAX_WIN:
+                    block.block_value = MAX_WIN
                 flag_event = True
         if flag_event:
             return "activated_collect"

@@ -14,15 +14,10 @@ import round_class
 
 CONST_SLEEP_TIME = 50
 DATABASE_UPDATE_INTERVAL = 1000
-# CURRENCY_UNIT = "POL"
-# CONST_BASE_BET = 0.005
-CURRENCY_UNIT = "XMR"
-CONST_BASE_BET = 0.005
-CONST_INITIAL_BALANCE = 100
-# CURRENCY_UNIT = "ETH"
-# CONST_BASE_BET = 0.000001
-# CONST_INITIAL_BALANCE = 0.01
 
+CONST_CURRENCY_UNIT = "EUR"
+CONST_BASE_BET = 1
+CONST_INITIAL_BALANCE = 15000
 
 CONST_BONUS_BUY_COST = 600
 class profile:
@@ -35,7 +30,7 @@ class profile:
         self.multi_leaderboard = []
         self.biggest_win = 0
         self.highest_multi = 0
-        self.speed_preference = 6
+        self.speed_preference = 5
 
     def add_round(self, result_multi, base_bet=CONST_BASE_BET, cost_multi=CONST_BONUS_BUY_COST):
         total_cost = base_bet * cost_multi
@@ -62,18 +57,18 @@ class profile:
                 self.multi_leaderboard.pop()
 
     def get_info(self):
-        info_string = f"Balance: {self.balance:,.6f} {CURRENCY_UNIT}\n"
+        info_string = f"Balance: {self.balance:,.6f} {CONST_CURRENCY_UNIT}\n"
         info_string += "Rounds played: " + str(self.rounds_played) + "\n"
-        info_string += f"Total wagered: {self.total_wagered:,.6f} {CURRENCY_UNIT}\n"
-        info_string += f"Total win: {self.total_win:,.6f} {CURRENCY_UNIT}\n"
+        info_string += f"Total wagered: {self.total_wagered:,.6f} {CONST_CURRENCY_UNIT}\n"
+        info_string += f"Total win: {self.total_win:,.6f} {CONST_CURRENCY_UNIT}\n"
         if self.rounds_played >= 5:
             info_string += f"RTP: {(self.total_win/self.total_wagered)*100:06.2f} % / 096.53 %\n"
         else:
             info_string += f"RTP: ???.?? % / 096.53 %\n"
-        info_string += f"Biggest win: {self.biggest_win:,.6f} {CURRENCY_UNIT}\n"
+        info_string += f"Biggest win: {self.biggest_win:,.6f} {CONST_CURRENCY_UNIT}\n"
         info_string += f"Highest multiplier: {self.highest_multi:,}x\n"
-        info_string += f"(Base bet: {CONST_BASE_BET:.6f} {CURRENCY_UNIT})\n"
-        info_string += "(Cost per round: " + str(CONST_BASE_BET*CONST_BONUS_BUY_COST) + " " + CURRENCY_UNIT + ")\n"
+        info_string += f"(Base bet: {CONST_BASE_BET:.6f} {CONST_CURRENCY_UNIT})\n"
+        info_string += "(Cost per round: " + str(CONST_BASE_BET*CONST_BONUS_BUY_COST) + " " + CONST_CURRENCY_UNIT + ")\n"
 
         return info_string
 
@@ -315,11 +310,16 @@ class visualized_window:
             self.window.after(interval, self.next_step)
             self.update_all_blocks(self.Round.get_latest_board())
             blocks = self.Round.get_latest_board().blocks
-            for i in range(25):
-                if blocks[i].isEmpty():
-                    self.empty_block_index.append(i)
+
+            if not self.Round.get_latest_board().get_total_value() >= round_class.MAX_WIN:
+                for i in range(25):
+                    if blocks[i].isEmpty():
+                        self.empty_block_index.append(i)
         # Call coin_reveal_loop again to continue the loop
         if self.Round.get_latest_board().is_finished_state() and len(self.empty_block_index) <= 0:
+            if self.Round.get_latest_board().get_total_value() >= round_class.MAX_WIN:
+                self.window.after(interval, self.next_step)
+            self.update_all_blocks(self.Round.get_latest_board())
             print("完整獎金")
             # print out board history but ignore the first element
             print(self.Round.board_history[1:])
@@ -327,7 +327,7 @@ class visualized_window:
             Board_Total_Value = self.Round.get_latest_board().get_total_value()
             self.PlayerProfile.add_round(Board_Total_Value)
             self.profile_info_label.config(text=self.PlayerProfile.get_info())
-            self.round_result_label.config(text=f"Round result:\n{Board_Total_Value:,}x\n{Board_Total_Value*CONST_BASE_BET:,.6f} {CURRENCY_UNIT}")
+            self.round_result_label.config(text=f"Round result:\n{Board_Total_Value:,}x\n{Board_Total_Value*CONST_BASE_BET:,.6f} {CONST_CURRENCY_UNIT}")
             return 1
         self.window.after(int(interval * 1.5), self.coin_reveal_loop)
 
