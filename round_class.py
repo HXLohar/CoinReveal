@@ -5,8 +5,8 @@ import json
 import math_class
 import numpy
 
-MAX_WIN = 400000
-
+CONST_MAX_WIN = 400000
+CONST_BONUS_PAY = [0, 0, 0, 80, 200, 500, 1500, 5000]
 
 class block:
     def __init__(self, ID, block_type="empty", block_value=0):
@@ -24,8 +24,8 @@ class block:
             # print("block value before multiply: " + str(self.block_value)
             # + ", multiplier: " + str(multiplier))
             self.block_value *= multiplier
-            if self.block_value > MAX_WIN:
-                self.block_value = MAX_WIN
+            if self.block_value > CONST_MAX_WIN:
+                self.block_value = CONST_MAX_WIN
 
     def erase(self):
         self.block_type = "empty"
@@ -106,11 +106,11 @@ def unwrap_string(wrapped_string):
     return block(0, "coin", int(wrapped_string))
 
 
-def unwrap_string_to_board(wrapped_board, math_model=1, seed=-1):
-    unwrapped_board = board_state(math_model, seed)
+def unwrap_string_to_board(wrapped_board):
+    unwrapped_board_string = []
     for i in range(25):
-        unwrapped_board.blocks[i] = unwrap_string(wrapped_board[i])
-    return unwrapped_board
+        unwrapped_board_string.append(unwrap_string(wrapped_board[i]))
+    return unwrapped_board_string
 
 
 class board_state:
@@ -132,7 +132,7 @@ class board_state:
     def is_finished_state(self):
         # if the sum of all block's value is no less than MAX_WIN, return True
         sum = self.get_total_value()
-        if sum >= MAX_WIN:
+        if sum >= CONST_MAX_WIN:
             # if every block is either coin or special_coin or empty, return True
             for block in self.blocks:
                 if block.block_type != "coin" and block.block_type != "special_coin" and block.block_type != "bonus" \
@@ -152,16 +152,16 @@ class board_state:
         for block in self.blocks:
             sum += block.get_value()
 
-        bonus_pay = [0, 0, 0, 80, 200, 500]
+
         self.BONUS_symbol_count = 0
         for block in self.blocks:
             if block.block_type == "bonus":
                 self.BONUS_symbol_count += 1
-        # print("BONUS: " + str(self.BONUS_symbol_count))
-        sum += bonus_pay[self.BONUS_symbol_count]
-        # print(f"BONUS pay: {bonus_pay[self.BONUS_symbol_count]}")
-        if sum > MAX_WIN:
-            sum = MAX_WIN
+
+        sum += CONST_BONUS_PAY[self.BONUS_symbol_count]
+
+        if sum > CONST_MAX_WIN:
+            sum = CONST_MAX_WIN
         return sum
 
     def next_step(self):
@@ -192,8 +192,8 @@ class board_state:
                         if block2.block_type != "special_coin":
                             block2.erase()
                 block.block_type = "special_coin"
-                if block.block_value > MAX_WIN:
-                    block.block_value = MAX_WIN
+                if block.block_value > CONST_MAX_WIN:
+                    block.block_value = CONST_MAX_WIN
                 flag_event = True
         if flag_event:
             return "activated_collect"
@@ -207,10 +207,8 @@ class board_state:
 
     def spin(self, math_model, c_activated, seed):
         wrapped_board = self.wrap_board()
-        result, self.BONUS_symbol_count = math_class.call_model_A(wrapped_board, c_activated, seed)
-        for i in range(25):
-            self.blocks[i] = unwrap_string(result[i])
-        return 0
+        result, self.BONUS_symbol_count = math_class.call_model_B(wrapped_board, c_activated, seed)
+        self.blocks = unwrap_string_to_board(result)
 
     def wrap_board(self):
         wrapped_board = []
@@ -220,9 +218,11 @@ class board_state:
 
 
 class Round:
-    def __init__(self, math_model=1, assigned_seed=-1):
+    def __init__(self, math_model="B", assigned_seed=1):
         self.math_model = math_model
         self.seed = assigned_seed
+        # seed_name_list = ["undefined", "AAA", "AA", "A", "B", "C", "D", "E", "F"]
+        # print("您的種子等級是: " + seed_name_list[self.seed])
         if assigned_seed < 0:
             self.seed = random.randint(0, 10000)
         self.current_board = board_state(self.math_model, self.seed)
@@ -288,7 +288,7 @@ def add_to_database(rounds, db_file_name="data.db", db_table_name="default_table
         # Calculate bonus_symbol_count and BONUS_pay
         bonus_symbol_count = round.current_board.BONUS_symbol_count
         # print(bonus_symbol_count)
-        bonus_pay = [0, 0, 0, 80, 200, 500][bonus_symbol_count]
+        bonus_pay = CONST_BONUS_PAY[bonus_symbol_count]
         result = round.current_board.get_total_value()
 
         # Insert the current round's data into the table

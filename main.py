@@ -10,14 +10,14 @@ import cProfile
 import pstats
 import time
 
-import round_class
+import round_class, math_class
 
 CONST_SLEEP_TIME = 50
 DATABASE_UPDATE_INTERVAL = 1000
 
-CONST_CURRENCY_UNIT = "EUR"
-CONST_BASE_BET = 1
-CONST_INITIAL_BALANCE = 15000
+CONST_CURRENCY_UNIT = "BTC"
+CONST_BASE_BET = 0.001
+CONST_INITIAL_BALANCE = 20
 
 CONST_BONUS_BUY_COST = 600
 class profile:
@@ -30,15 +30,19 @@ class profile:
         self.multi_leaderboard = []
         self.biggest_win = 0
         self.highest_multi = 0
-        self.speed_preference = 5
+        self.speed_preference = 6
 
     def add_round(self, result_multi, base_bet=CONST_BASE_BET, cost_multi=CONST_BONUS_BUY_COST):
         total_cost = base_bet * cost_multi
         win_amount = base_bet * result_multi
-        self.total_wagered += total_cost
+        # self.total_wagered += total_cost
+        # moved to the init spin part
         self.total_win += win_amount
         self.balance += (win_amount - total_cost)
-        self.rounds_played += 1
+
+        if result_multi >= round_class.CONST_MAX_WIN:
+            print("Limit reached: Congratulations on hitting the Max Win!\n限額已達到: 感謝您 中得 最大獎!")
+
         self.biggest_win = max(self.biggest_win, win_amount)
         self.highest_multi = max(self.highest_multi, result_multi)
         if result_multi < 1000:
@@ -56,12 +60,12 @@ class profile:
             if len(self.multi_leaderboard) > 10:
                 self.multi_leaderboard.pop()
 
-    def get_info(self):
+    def get_info(self, ongoing_round=False):
         info_string = f"Balance: {self.balance:,.6f} {CONST_CURRENCY_UNIT}\n"
         info_string += "Rounds played: " + str(self.rounds_played) + "\n"
         info_string += f"Total wagered: {self.total_wagered:,.6f} {CONST_CURRENCY_UNIT}\n"
         info_string += f"Total win: {self.total_win:,.6f} {CONST_CURRENCY_UNIT}\n"
-        if self.rounds_played >= 5:
+        if self.rounds_played >= 5 and not ongoing_round:
             info_string += f"RTP: {(self.total_win/self.total_wagered)*100:06.2f} % / 096.53 %\n"
         else:
             info_string += f"RTP: ???.?? % / 096.53 %\n"
@@ -83,6 +87,10 @@ class profile:
 
 class visualized_window:
     def __init__(self, round_class=None):
+        self.start_time = None
+        self.finish_time = None
+        self.round_count = 0
+
         self.PlayerProfile = profile()
         self.Round = round_class
         self.Round_list = []
@@ -156,6 +164,7 @@ class visualized_window:
     def action_spins(self):
         # messagebox.showinfo("出錯了", "無法使用特快.")
         # return -1
+        self.start_time = time.time()
 
         def profiled_code():
 
@@ -195,7 +204,9 @@ class visualized_window:
                     if i > alert_threshold[0] * 5:
                         for j in range(len(alert_threshold)):
                             alert_threshold[j] *= 10
-
+            else:
+                return -1
+            self.round_count = num_rounds
             print("--------\nLeaderboard\n")
             print(f"# 1: ", sorted(Round_results)[-1])
             print(f"# 2: ", sorted(Round_results)[-2])
@@ -212,7 +223,7 @@ class visualized_window:
             print("Bottom 5% percentile: ", sorted(Round_results)[num_rounds // 20])
             print("Bottom 2% percentile: ", sorted(Round_results)[num_rounds // 50])
             print("Bottom 1% percentile: ", sorted(Round_results)[num_rounds // 100])
-            thresholds = [500, 600, 1000, 2500, 5000, 10000, 20000, 50000, 100000, 150000, 200000, 250000]
+            thresholds = [500, 600, 1000, 2500, 5000, 10000, 20000, 50000, 100000, 150000, 250000, 350000]
             print("--------\nThresholds\n")
             for threshold in thresholds:
                 qualifying_rounds = len([x for x in Round_results if x >= threshold])
@@ -232,6 +243,12 @@ class visualized_window:
 
         p = pstats.Stats('profile_results.prof')
         p.sort_stats('cumulative').print_stats(10)
+
+        self.finish_time = time.time()
+        time_spent_in_seconds = self.finish_time - self.start_time
+        print(f"總耗時 (單位: 秒): {time_spent_in_seconds:,}")
+        rounds_per_second = self.round_count / time_spent_in_seconds
+        print(f"速度 (回合數 / 每秒): {rounds_per_second:.2f}")
 
     def update_all_blocks(self, new_board_state):
         # print("update method called")
@@ -265,7 +282,8 @@ class visualized_window:
             self.Round.next_step()
             # if not self.action_spin:
             # self.update_all_blocks(self.Round.current_board)
-            self.window.update()
+            if not self.action_spin:
+                self.window.update()
             return 0
         else:
             print("Game finished")
@@ -287,7 +305,10 @@ class visualized_window:
             messagebox.showinfo("警告", "禁止同時進行多個獎勵購買.")
             return -1
         self.round_result_label.config(text=f"Round result:\n\n")
-
+        self.PlayerProfile.rounds_played += 1
+        self.PlayerProfile.total_wagered += CONST_BASE_BET * CONST_BONUS_BUY_COST
+        # update profile label
+        self.profile_info_label.config(text=self.PlayerProfile.get_info(True))
         self.ONGOING_ROUND = True
         self.Round = round_class.Round()
         self.update_all_blocks(self.Round.get_latest_board())
@@ -311,18 +332,18 @@ class visualized_window:
             self.update_all_blocks(self.Round.get_latest_board())
             blocks = self.Round.get_latest_board().blocks
 
-            if not self.Round.get_latest_board().get_total_value() >= round_class.MAX_WIN:
+            if not self.Round.get_latest_board().get_total_value() >= round_class.CONST_MAX_WIN:
                 for i in range(25):
                     if blocks[i].isEmpty():
                         self.empty_block_index.append(i)
         # Call coin_reveal_loop again to continue the loop
         if self.Round.get_latest_board().is_finished_state() and len(self.empty_block_index) <= 0:
-            if self.Round.get_latest_board().get_total_value() >= round_class.MAX_WIN:
+            if self.Round.get_latest_board().get_total_value() >= round_class.CONST_MAX_WIN:
                 self.window.after(interval, self.next_step)
             self.update_all_blocks(self.Round.get_latest_board())
-            print("完整獎金")
+            # print("完整獎金:")
             # print out board history but ignore the first element
-            print(self.Round.board_history[1:])
+            # print(self.Round.board_history[1:])
             self.ONGOING_ROUND = False
             Board_Total_Value = self.Round.get_latest_board().get_total_value()
             self.PlayerProfile.add_round(Board_Total_Value)
@@ -331,7 +352,7 @@ class visualized_window:
             return 1
         self.window.after(int(interval * 1.5), self.coin_reveal_loop)
 
-
+math_class.init_seed_configs()
 test_round = round_class.Round()
 # test_round.spin()
 
