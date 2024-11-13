@@ -34,7 +34,7 @@ def call_model_A(wrapped_board_array, c_activated, seed):
     # print("Previous state\n", wrapped_board_state)
     wrapped_board_array = np.array(wrapped_board_array, dtype='<U10')
     empty_block_count = len(np.where(wrapped_board_array == EMPTY_BLOCK)[0])
-
+    # print(C_CHANCE_DECREASE_SPEED)
     offset_factor = (1 - C_CHANCE_DECREASE_SPEED) ** c_activated
     chance_c = max(C_CHANCE_PER_BLOCK * empty_block_count * offset_factor, MIN_C_CHANCE_PER_BLOCK * empty_block_count)
 
@@ -68,24 +68,26 @@ def call_model_A(wrapped_board_array, c_activated, seed):
     # print("Board:\n", wrapped_board_array)
     return wrapped_board_array.tolist(), bonus_count
 
-
-
 def call_model_B(wrapped_board_array, c_activated, seed_id):
     global coin_chances, multiplier_chances, bonus_chances, C_CHANCE_PER_BLOCK, C_CHANCE_DECREASE_SPEED, MIN_C_CHANCE_PER_BLOCK
     global previous_seed, premium_coin_configs
 
     if seed_id != previous_seed:
         previous_seed = seed_id
-        seed_config = seed_configs[seed_id - 1]
+        seed_config = seed_configs[seed_id]
         coin_chances = seed_config['coin_chances']
         multiplier_chances = seed_config['multiplier_chances']
         bonus_chances = seed_config['bonus_chances']
         C_CHANCE_PER_BLOCK = seed_config['c_chance_per_block']
         C_CHANCE_DECREASE_SPEED = seed_config['c_chance_decrease_speed']
         MIN_C_CHANCE_PER_BLOCK = seed_config['min_c_chance_per_block']
-
+    # print("SEED INFO DEBUG:")
+    # print(seed_id)
+    # print(coin_chances)
+    # print(multiplier_chances)
+    # print(bonus_chances)
     if is_empty_board(wrapped_board_array):
-        if seed_id <= 3:
+        if seed_id <= 3 and seed_id > 0:
             good_symbols = ["coin", "multiplier", "collect"]
             random.shuffle(good_symbols)
             good_symbol_types = 4 - seed_id
@@ -94,6 +96,9 @@ def call_model_B(wrapped_board_array, c_activated, seed_id):
                 if good_symbols[i] == "collect":
                     wrapped_board_array[good_symbol_indexes[i]] = "C"
                 elif good_symbols[i] == "multiplier":
+                    # print(seed_id)
+                    # print(multiplier_values)
+                    # print(multiplier_chances)
                     multiplier = random.choices(multiplier_values, weights=multiplier_chances, k=1)[0]
                     wrapped_board_array[good_symbol_indexes[i]] = f"x{multiplier}"
                 else:

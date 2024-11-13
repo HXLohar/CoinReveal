@@ -218,10 +218,10 @@ class board_state:
 
 
 class Round:
-    def __init__(self, math_model="B", assigned_seed=1):
+    def __init__(self, math_model="B", assigned_seed=4):
         self.math_model = math_model
         self.seed = assigned_seed
-        # seed_name_list = ["undefined", "AAA", "AA", "A", "B", "C", "D", "E", "F"]
+        # seed_name_list = ["SPECIAL", "AAA", "AA", "A", "B", "C", "D", "E", "F"]
         # print("您的種子等級是: " + seed_name_list[self.seed])
         if assigned_seed < 0:
             self.seed = random.randint(0, 10000)
@@ -255,7 +255,6 @@ class Round:
             self.result = self.current_board.get_total_value()
         else:
             self.current_board.next_step()
-
             self.board_history.append(self.current_board.wrap_board())
 
 

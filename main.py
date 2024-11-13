@@ -16,10 +16,10 @@ CONST_SLEEP_TIME = 50
 DATABASE_UPDATE_INTERVAL = 1000
 
 CONST_CURRENCY_UNIT = "BTC"
-CONST_BASE_BET = 0.001
-CONST_INITIAL_BALANCE = 20
+CONST_BASE_BET = 0.0001
+CONST_INITIAL_BALANCE = 5
 
-CONST_BONUS_BUY_COST = 600
+CONST_BONUS_BUY_COST = 6200
 class profile:
     def __init__(self):
         self.balance = CONST_INITIAL_BALANCE
@@ -81,7 +81,7 @@ class profile:
         return interval[self.speed_preference]
 
     def get_interval_between_steps(self):
-        interval = [1600, 1200, 900, 600, 400, 200, 100]
+        interval = [1000, 800, 600, 400, 300, 200, 100]
         return interval[self.speed_preference]
 
 
@@ -223,7 +223,7 @@ class visualized_window:
             print("Bottom 5% percentile: ", sorted(Round_results)[num_rounds // 20])
             print("Bottom 2% percentile: ", sorted(Round_results)[num_rounds // 50])
             print("Bottom 1% percentile: ", sorted(Round_results)[num_rounds // 100])
-            thresholds = [500, 600, 1000, 2500, 5000, 10000, 20000, 50000, 100000, 150000, 250000, 350000]
+            thresholds = [500, 600, 1000, 2500, 5000, 10000, 20000, 50000, 100000, 150000, 250000, 400000]
             print("--------\nThresholds\n")
             for threshold in thresholds:
                 qualifying_rounds = len([x for x in Round_results if x >= threshold])
@@ -278,17 +278,18 @@ class visualized_window:
             # print("updating block index", i)
 
     def next_step(self):
-        if not self.Round.get_latest_board().is_finished_state():
+        latest_board = self.Round.get_latest_board()  # Cache the result of get_latest_board
+        if not latest_board.is_finished_state():
             self.Round.next_step()
+
+            # removed window update code during action spin debug to make it faster (maybe)
             # if not self.action_spin:
-            # self.update_all_blocks(self.Round.current_board)
-            if not self.action_spin:
-                self.window.update()
-            return 0
+                # self.window.update()
+            # return 0
         else:
-            print("Game finished")
-            print("Total value:", self.Round.get_latest_board().get_total_value())
-            print(self.Round.board_history)
+            # print("Game finished")
+            # print("Total value:", latest_board.get_total_value())
+            # print(self.Round.board_history)
             return 1
 
     def next_block(self):
