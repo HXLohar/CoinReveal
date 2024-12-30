@@ -37,7 +37,8 @@ def call_model_A(wrapped_board_array, c_activated, seed):
     # print(C_CHANCE_DECREASE_SPEED)
     offset_factor = (1 - C_CHANCE_DECREASE_SPEED) ** c_activated
     chance_c = max(C_CHANCE_PER_BLOCK * empty_block_count * offset_factor, MIN_C_CHANCE_PER_BLOCK * empty_block_count)
-
+    # print("offset_factor", offset_factor)
+    # print(f"Expected to decrease by {C_CHANCE_DECREASE_SPEED*100} %")
     if np.random.uniform(0, 1) < chance_c:
         flag_existing_C = "C" in wrapped_board_array
         empty_block_indices = np.where(wrapped_board_array == EMPTY_BLOCK)[0]
@@ -73,6 +74,8 @@ def call_model_B(wrapped_board_array, c_activated, seed_id):
     global previous_seed, premium_coin_configs
 
     if seed_id != previous_seed:
+        # print(f"seed id: {seed_id}, previous seed: {previous_seed}")
+
         previous_seed = seed_id
         seed_config = seed_configs[seed_id]
         coin_chances = seed_config['coin_chances']
@@ -80,6 +83,8 @@ def call_model_B(wrapped_board_array, c_activated, seed_id):
         bonus_chances = seed_config['bonus_chances']
         C_CHANCE_PER_BLOCK = seed_config['c_chance_per_block']
         C_CHANCE_DECREASE_SPEED = seed_config['c_chance_decrease_speed']
+
+        # print(f"c_chance_decrease_speed: {C_CHANCE_DECREASE_SPEED * 100:.2f} %")
         MIN_C_CHANCE_PER_BLOCK = seed_config['min_c_chance_per_block']
     # print("SEED INFO DEBUG:")
     # print(seed_id)

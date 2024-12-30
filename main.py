@@ -15,11 +15,11 @@ import round_class, math_class
 CONST_SLEEP_TIME = 50
 DATABASE_UPDATE_INTERVAL = 1000
 
-CONST_CURRENCY_UNIT = "BTC"
-CONST_BASE_BET = 0.0001
-CONST_INITIAL_BALANCE = 5
+CONST_CURRENCY_UNIT = "EUR"
+CONST_BASE_BET = 1
+CONST_INITIAL_BALANCE = 10000
 
-CONST_BONUS_BUY_COST = 6200
+CONST_BONUS_BUY_COST = 500
 class profile:
     def __init__(self):
         self.balance = CONST_INITIAL_BALANCE
@@ -90,6 +90,9 @@ class visualized_window:
         self.start_time = None
         self.finish_time = None
         self.round_count = 0
+        # SET THE SEED HERE
+        self.seed = 8
+        # SET THE SEED HERE
 
         self.PlayerProfile = profile()
         self.Round = round_class
@@ -101,7 +104,7 @@ class visualized_window:
         self.board_state = self.Round.current_board
         # window size 800x600 with disabled minimize and maximize buttons and not allowing size change
         self.window = tk.Tk()
-        self.window.title("CoinFlip.exe")
+        self.window.title("CoinReveal.exe")
         self.window.geometry("900x600")
         self.window.resizable(False, False)
         self.action_spin = False
@@ -186,7 +189,7 @@ class visualized_window:
                 for i in range(num_rounds):
                     self.Round = round_class.Round()
                     self.action_spin = True
-                    self.Round.spin()
+                    self.Round.spin(seed=self.seed)
                     while not self.Round.get_latest_board().is_finished_state():
                         self.next_step()
                     # only interact with the database once every DATABASE_UPDATE_INTERVAL rounds
@@ -313,7 +316,7 @@ class visualized_window:
         self.ONGOING_ROUND = True
         self.Round = round_class.Round()
         self.update_all_blocks(self.Round.get_latest_board())
-        self.Round.spin()
+        self.Round.spin(seed=self.seed)
         for i in range(25):
             self.empty_block_index.append(i)
         # then display the result one by one accordingly

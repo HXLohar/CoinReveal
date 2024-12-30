@@ -218,7 +218,7 @@ class board_state:
 
 
 class Round:
-    def __init__(self, math_model="B", assigned_seed=4):
+    def __init__(self, math_model="B", assigned_seed=-1):
         self.math_model = math_model
         self.seed = assigned_seed
         # seed_name_list = ["SPECIAL", "AAA", "AA", "A", "B", "C", "D", "E", "F"]
@@ -246,8 +246,13 @@ class Round:
             index += 1
         return latest_board
 
-    def spin(self):
-        self.current_board.spin(self.math_model, self.current_board.c_activated, self.seed)
+    def spin(self, seed=-1):
+        if seed == -1:
+            seed = self.seed
+        else:
+            self.seed = seed
+        self.current_board.seed = seed
+        self.current_board.spin(self.math_model, self.current_board.c_activated, seed)
         self.board_history.append(self.current_board.wrap_board())
 
     def next_step(self):
