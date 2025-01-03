@@ -25,7 +25,7 @@ def get_RTP(version):
 
     # 97版(97.43%)96版(96.26%)\n94版(94.10%)\n92版(92.13%)\n87版(87.27%)\n任何違規輸入則會得到87版.
     RTP_dict = {97: 97.33, 96: 96.10, 94: 94.07, 92: 92.03, 87: 87.12}
-    return RTP_dict.get(version, 87.27)
+    return RTP_dict.get(version, 87.12)
 
 def write_to_csv(data, file_name):
     with open(file_name, 'w') as f:
