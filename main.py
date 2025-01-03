@@ -20,6 +20,18 @@ CONST_BASE_BET = 1
 CONST_INITIAL_BALANCE = 10000
 
 CONST_BONUS_BUY_COST = 500
+
+def get_RTP(version):
+
+    # 97版(97.43%)96版(96.26%)\n94版(94.10%)\n92版(92.13%)\n87版(87.27%)\n任何違規輸入則會得到87版.
+    RTP_dict = {97: 97.33, 96: 96.10, 94: 94.07, 92: 92.03, 87: 87.12}
+    return RTP_dict.get(version, 87.27)
+
+def write_to_csv(data, file_name):
+    with open(file_name, 'w') as f:
+        for item in data:
+            f.write(f"{item}\n")
+
 class profile:
     def __init__(self):
         self.balance = CONST_INITIAL_BALANCE
@@ -60,15 +72,15 @@ class profile:
             if len(self.multi_leaderboard) > 10:
                 self.multi_leaderboard.pop()
 
-    def get_info(self, ongoing_round=False):
+    def get_info(self, ongoing_round=False, RTP_version=94):
         info_string = f"Balance: {self.balance:,.6f} {CONST_CURRENCY_UNIT}\n"
         info_string += "Rounds played: " + str(self.rounds_played) + "\n"
         info_string += f"Total wagered: {self.total_wagered:,.6f} {CONST_CURRENCY_UNIT}\n"
         info_string += f"Total win: {self.total_win:,.6f} {CONST_CURRENCY_UNIT}\n"
         if self.rounds_played >= 5 and not ongoing_round:
-            info_string += f"RTP: {(self.total_win/self.total_wagered)*100:06.2f} % / 096.53 %\n"
+            info_string += f"RTP: {(self.total_win/self.total_wagered)*100:06.2f} % / 0{get_RTP(RTP_version):.2f} %\n"
         else:
-            info_string += f"RTP: ???.?? % / 096.53 %\n"
+            info_string += f"RTP: ???.?? % / 0{get_RTP(RTP_version):.2f} %\n"
         info_string += f"Biggest win: {self.biggest_win:,.6f} {CONST_CURRENCY_UNIT}\n"
         info_string += f"Highest multiplier: {self.highest_multi:,}x\n"
         info_string += f"(Base bet: {CONST_BASE_BET:.6f} {CONST_CURRENCY_UNIT})\n"
@@ -91,8 +103,10 @@ class visualized_window:
         self.finish_time = None
         self.round_count = 0
         # SET THE SEED HERE
-        self.seed = 8
+        self.seed = -1 # -1 means not set (determine randomly)
         # SET THE SEED HERE
+
+        self.RTP_version = 94
 
         self.PlayerProfile = profile()
         self.Round = round_class
@@ -111,7 +125,7 @@ class visualized_window:
         self.block_display_images = []
         # profile info is at top right
         # text align to left
-        self.profile_info_label = tk.Label(self.window, text=self.PlayerProfile.get_info(), font=("Helvetica", 14),
+        self.profile_info_label = tk.Label(self.window, text=self.PlayerProfile.get_info(RTP_version=self.RTP_version), font=("Helvetica", 14),
                                            anchor="w", justify="left")
         self.profile_info_label.place(x=525, y=10, width=375, height=275)
         # round result label at bottom right
@@ -154,6 +168,10 @@ class visualized_window:
         self.rounds_button = tk.Button(self.window, text="Action Spins", command=self.action_spins)
         self.rounds_button.place(x=550, y=390, width=100, height=50)
 
+        # add a RTP button at bottom left
+        self.RTP_button = tk.Button(self.window, text=f"RTP: {get_RTP(self.RTP_version):.2f}%", command=self.set_RTP_version)
+        self.RTP_button.place(x=30, y=520, width=100, height=50)
+
         # display the interface
         self.window.mainloop()
 
@@ -163,7 +181,14 @@ class visualized_window:
             self.window.after(100)  # Wait for 100 ms
             result = simpledialog.askstring(title, prompt, initialvalue=default_value, parent=self.window)
         return result
-
+    def set_RTP_version(self):
+        self.RTP_version = simpledialog.askinteger("RTP 版本變更",
+                                                   "輸入想使用的RTP版本.\n可用的版本有:\n97版(97.33%)\n96版(96.10%)\n94版(94.07%)\n92版(92.03%)\n87版(87.12%)\n任何違規輸入則會得到87版.", initialvalue=94)
+        if self.RTP_version is None or self.RTP_version not in [97, 96, 94, 92, 87]:
+            self.RTP_version = 87
+        # update RTP button text
+        self.RTP_button.config(text=f"RTP: {get_RTP(self.RTP_version):.2f}%")
+        self.profile_info_label.config(text=self.PlayerProfile.get_info(RTP_version=self.RTP_version))
     def action_spins(self):
         # messagebox.showinfo("出錯了", "無法使用特快.")
         # return -1
@@ -172,10 +197,11 @@ class visualized_window:
         def profiled_code():
 
             Round_results = []
-            alert_threshold = [1, 2, 5]
+            alert_threshold = [1, 2, 4, 7]
             # print("alert_threshold", alert_threshold)
             num_rounds = int(self.rounds_entry.get())
-            if messagebox.askokcancel("Action Spins", f"Are you sure you want to perform {num_rounds} rounds?"):
+            if messagebox.askokcancel("Action Spins", f"Are you sure you want to perform {num_rounds} rounds?"
+                                                      f"\nSelected RTP version: {get_RTP(self.RTP_version):.2f}%"):
                 # ask to input db file name
                 # use tkinter to create a popup window, not using the input command line
 
@@ -184,19 +210,25 @@ class visualized_window:
                 db_table_name = self.ask_string("Input",
                                                 "Please input the table name\nOr leave blank for default_table: ",
                                                 "default_table")
-
+                csv_file_name = self.ask_string("Input",
+                                                "保存為csv的文件名\n(默認: data.csv)\n注意: 該文件僅包含回合的結果倍數.",
+                                                "data.csv")
                 # print("called action spins")
+                csv_output = []
                 for i in range(num_rounds):
                     self.Round = round_class.Round()
                     self.action_spin = True
-                    self.Round.spin(seed=self.seed)
+                    self.Round.spin(RTP_version=self.RTP_version, action_spin=True)
                     while not self.Round.get_latest_board().is_finished_state():
                         self.next_step()
                     # only interact with the database once every DATABASE_UPDATE_INTERVAL rounds
                     self.Round_list.append(self.Round)
+                    csv_output.append(self.Round.get_latest_board().get_total_value())
                     if i % DATABASE_UPDATE_INTERVAL == (DATABASE_UPDATE_INTERVAL - 1) or i == num_rounds - 1:
                         round_class.add_to_database(self.Round_list, db_file_name, db_table_name)
                         self.Round_list = []
+                        # dump result to csv file
+                        write_to_csv(csv_output, csv_file_name)
 
                     Round_results.append(self.Round.current_board.get_total_value())
                     if i in alert_threshold:
@@ -204,16 +236,16 @@ class visualized_window:
                             time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + ", "
                         output_string += f"Progress: Round {i} finished"
                         print(output_string)
-                    if i > alert_threshold[0] * 5:
+                    if i > alert_threshold[len(alert_threshold) - 1]:
                         for j in range(len(alert_threshold)):
                             alert_threshold[j] *= 10
             else:
                 return -1
             self.round_count = num_rounds
-            print("--------\nLeaderboard\n")
-            print(f"# 1: ", sorted(Round_results)[-1])
-            print(f"# 2: ", sorted(Round_results)[-2])
-            print(f"# 3: ", sorted(Round_results)[-3])
+            # print("--------\nLeaderboard\n")
+            # print(f"# 1: ", sorted(Round_results)[-1])
+            # print(f"# 2: ", sorted(Round_results)[-2])
+            # print(f"# 3: ", sorted(Round_results)[-3])
             print("--------\nTop percentile\n")
             print("Top 1% percentile: ", sorted(Round_results)[-num_rounds // 100])
             print("Top 2% percentile: ", sorted(Round_results)[-num_rounds // 50])
@@ -312,11 +344,11 @@ class visualized_window:
         self.PlayerProfile.rounds_played += 1
         self.PlayerProfile.total_wagered += CONST_BASE_BET * CONST_BONUS_BUY_COST
         # update profile label
-        self.profile_info_label.config(text=self.PlayerProfile.get_info(True))
+        self.profile_info_label.config(text=self.PlayerProfile.get_info(True, self.RTP_version))
         self.ONGOING_ROUND = True
         self.Round = round_class.Round()
         self.update_all_blocks(self.Round.get_latest_board())
-        self.Round.spin(seed=self.seed)
+        self.Round.spin(RTP_version=self.RTP_version)
         for i in range(25):
             self.empty_block_index.append(i)
         # then display the result one by one accordingly
@@ -351,7 +383,7 @@ class visualized_window:
             self.ONGOING_ROUND = False
             Board_Total_Value = self.Round.get_latest_board().get_total_value()
             self.PlayerProfile.add_round(Board_Total_Value)
-            self.profile_info_label.config(text=self.PlayerProfile.get_info())
+            self.profile_info_label.config(text=self.PlayerProfile.get_info(RTP_version=self.RTP_version))
             self.round_result_label.config(text=f"Round result:\n{Board_Total_Value:,}x\n{Board_Total_Value*CONST_BASE_BET:,.6f} {CONST_CURRENCY_UNIT}")
             return 1
         self.window.after(int(interval * 1.5), self.coin_reveal_loop)

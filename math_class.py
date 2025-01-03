@@ -77,6 +77,7 @@ def call_model_B(wrapped_board_array, c_activated, seed_id):
         # print(f"seed id: {seed_id}, previous seed: {previous_seed}")
 
         previous_seed = seed_id
+        # print(f"Seed id: {seed_id}")
         seed_config = seed_configs[seed_id]
         coin_chances = seed_config['coin_chances']
         multiplier_chances = seed_config['multiplier_chances']

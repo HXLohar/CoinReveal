@@ -76,6 +76,37 @@ class block:
     def isEmpty(self):
         return self.block_type == "empty"
 
+import csv
+import random
+seed_name_list = ["SPECIAL", "AAA", "AA", "A", "B", "C", "D", "E", "F"]
+def get_seed(RTP_version):
+    # Define the valid RTP versions and default to 87 if the input is invalid
+    valid_versions = [97, 96, 94, 92, 87]
+    if RTP_version not in valid_versions:
+        RTP_version = 87
+
+    # Read the CSV file and store the weights for the given RTP version
+    weights = []
+    with open('rtp_seed.csv', mode='r') as file:
+        # print("debug: csv file:")
+        # print csv file
+        # debug_csv_reader = csv.reader(file)
+        # for row in debug_csv_reader:
+            # print(row)
+        csv_reader = csv.DictReader(file)
+        for row in csv_reader:
+            if int(row['rtp_version']) == RTP_version:
+                weights = [float(row[f'seed_{i}']) for i in range(9)]
+                break
+
+    # Normalize the weights to sum to 1
+    total_weight = sum(weights)
+    normalized_weights = [weight / total_weight for weight in weights]
+
+    # Randomly select a seed based on the weights
+    seed = random.choices(range(9), weights=normalized_weights, k=1)[0]
+    # print("your seed is: " + str(seed))
+    return seed
 
 def wrap_string(block):
     if block.block_type == "empty":
@@ -221,8 +252,9 @@ class Round:
     def __init__(self, math_model="B", assigned_seed=-1):
         self.math_model = math_model
         self.seed = assigned_seed
+        self.RTP_version = 94
         # seed_name_list = ["SPECIAL", "AAA", "AA", "A", "B", "C", "D", "E", "F"]
-        # print("您的種子等級是: " + seed_name_list[self.seed])
+
         if assigned_seed < 0:
             self.seed = random.randint(0, 10000)
         self.current_board = board_state(self.math_model, self.seed)
@@ -246,13 +278,23 @@ class Round:
             index += 1
         return latest_board
 
-    def spin(self, seed=-1):
-        if seed == -1:
-            seed = self.seed
-        else:
+    def spin(self, seed=-1, RTP_version=94, action_spin=False):
+
+        if not (RTP_version in [97, 96, 94, 92, 87]):
+            RTP_version = 87
+        self.RTP_version = RTP_version
+        if not seed == -1:
             self.seed = seed
-        self.current_board.seed = seed
-        self.current_board.spin(self.math_model, self.current_board.c_activated, seed)
+        else:
+            self.seed = get_seed(self.RTP_version)
+            if not action_spin:
+                print(f"您得到的種子ID:{self.seed}")
+                print(f"對應級別:{seed_name_list[self.seed]}")
+
+
+        self.current_board.seed = self.seed
+        # print("seed id in class round: " + str(self.seed))
+        self.current_board.spin(self.math_model, self.current_board.c_activated, self.seed)
         self.board_history.append(self.current_board.wrap_board())
 
     def next_step(self):
